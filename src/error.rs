@@ -1,11 +1,7 @@
-use std::sync::mpsc;
-
-use crate::config::MTU;
-
 #[derive(Debug)]
 pub enum ErrorKind {
     SerialPort,
-    Internal,
+    Io,
     PayloadTooLarge,
 }
 
@@ -32,7 +28,7 @@ impl Error {
         match kind {
             ErrorKind::PayloadTooLarge => Self {
                 kind: ErrorKind::PayloadTooLarge,
-                description: format!("payload can't be larger than MTU of {}", MTU),
+                description: format!("payload can't be larger than MTU of {}", crate::config::MTU),
             },
             _ => unimplemented!(),
         }
@@ -43,11 +39,11 @@ impl Error {
     }
 }
 
-impl From<mpsc::SendError<Vec<u8>>> for Error {
-    fn from(_error: mpsc::SendError<Vec<u8>>) -> Self {
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
         Self {
-            kind: ErrorKind::Internal,
-            description: "internal tx thread shut down".to_string(),
+            kind: ErrorKind::Io,
+            description: error.to_string(),
         }
     }
 }
