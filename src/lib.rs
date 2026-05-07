@@ -1,8 +1,12 @@
-use std::io::Write;
+use std::io::{Read, Write};
+use std::sync::mpsc;
+use std::thread;
 use std::time::Duration;
 
-use serial::SerialPort;
-use serial::unix::TTYPort;
+use serialport::{DataBits, FlowControl, Parity, StopBits};
+
+const BAUD_RATE: u32 = 115_200;
+const MTU: usize = 508;
 
 #[derive(Default)]
 pub enum Region {
@@ -195,27 +199,127 @@ impl Default for RadioConfig {
 }
 
 pub struct RNodeInterface {
-    port: TTYPort,
     config: RadioConfig,
+    tx: mpsc::Sender<Vec<u8>>,
+}
+
+enum State {
+    Tx,
+    Rx,
+}
+
+#[derive(Debug)]
+pub enum ErrorKind {
+    SerialPort,
+    Internal,
+    PayloadTooLarge,
+}
+
+#[derive(Debug)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub description: String,
+}
+
+impl std::error::Error for Error {
+    fn description(&self) -> &str {
+        &self.description
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.description)
+    }
+}
+
+impl Error {
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
+
+    fn payload_too_large() -> Self {
+        Self {
+            kind: ErrorKind::PayloadTooLarge,
+            description: format!("payload can't be larger than MTU of {}", MTU),
+        }
+    }
+}
+
+impl From<mpsc::SendError<Vec<u8>>> for Error {
+    fn from(_error: mpsc::SendError<Vec<u8>>) -> Self {
+        Self {
+            kind: ErrorKind::Internal,
+            description: "internal tx thread shut down".to_string(),
+        }
+    }
+}
+
+impl From<serialport::Error> for Error {
+    fn from(error: serialport::Error) -> Self {
+        Self {
+            kind: ErrorKind::SerialPort,
+            description: error.description,
+        }
+    }
 }
 
 impl RNodeInterface {
-    pub fn new(port: &str, config: RadioConfig) -> Result<Self, serial::Error> {
+    pub fn new(port: &str, config: RadioConfig) -> Result<Self, Error> {
         // Initialise serial port.
-        let mut port = serial::open(port)?;
+        let mut port = serialport::new(port, BAUD_RATE)
+            .stop_bits(StopBits::One)
+            .parity(Parity::None)
+            .flow_control(FlowControl::None)
+            .data_bits(DataBits::Eight)
+            .timeout(Duration::from_millis(1000))
+            .open()?;
 
-        port.reconfigure(&|settings| {
-            settings.set_baud_rate(serial::Baud115200)?;
-            settings.set_char_size(serial::Bits8);
-            settings.set_parity(serial::ParityNone);
-            settings.set_stop_bits(serial::Stop1);
-            settings.set_flow_control(serial::FlowNone);
-            Ok(())
-        })?;
-        port.set_timeout(Duration::from_millis(1000))?;
+        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+
+        thread::spawn(move || {
+            let mut state = State::Rx;
+            let mut buf = Vec::with_capacity(1);
+
+            loop {
+                match state {
+                    State::Tx => match rx.try_recv() {
+                        Ok(bytes) => {
+                            println!("write {} bytes", bytes.len());
+
+                            match port.write(&bytes) {
+                                Ok(_written) => {
+                                    // TODO
+                                }
+                                Err(_err) => {
+                                    // TODO
+                                }
+                            }
+                        }
+                        Err(mpsc::TryRecvError::Empty) => {
+                            state = State::Rx;
+                        }
+                        Err(mpsc::TryRecvError::Disconnected) => break,
+                    },
+                    State::Rx => {
+                        if port.bytes_to_read().unwrap() == 0 {
+                            state = State::Tx;
+                            println!("EOF =================== EOF");
+                            continue;
+                        }
+
+                        if let Err(_err) = port.read_exact(&mut buf) {
+                            break;
+                        }
+
+                        println!("{:#04x}", buf[0]);
+                    }
+                }
+            }
+        });
 
         // Initialise radio.
-        let mut rnode = Self { port, config };
+        let rnode = Self { config, tx };
         rnode.set_frequency()?;
         rnode.set_bandwidth()?;
         rnode.set_tx_power()?;
@@ -226,63 +330,88 @@ impl RNodeInterface {
         Ok(rnode)
     }
 
-    fn set_frequency(&mut self) -> Result<(), serial::Error> {
+    pub fn send(&self, data: impl Into<Vec<u8>>) -> Result<(), Error> {
+        let data = data.into();
+
+        if data.len() > MTU {
+            return Err(Error::payload_too_large());
+        }
+
+        self.tx.send(data)?;
+
+        Ok(())
+    }
+
+    pub fn set_frequency(&self) -> Result<(), Error> {
         let mut command = Vec::new();
         command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_FREQUENCY as u8]);
         command.extend_from_slice(&self.config.frequency.to_be_bytes());
         command.extend_from_slice(&[KISS::FEND as u8]);
 
-        self.port.write_all(&command)?;
+        self.send(command)?;
+
         Ok(())
     }
 
-    fn set_bandwidth(&mut self) -> Result<(), serial::Error> {
+    pub fn set_bandwidth(&self) -> Result<(), Error> {
         let mut command = Vec::new();
         command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_BANDWIDTH as u8]);
         command.extend_from_slice(&self.config.bandwidth.to_be_bytes());
         command.extend_from_slice(&[KISS::FEND as u8]);
 
-        self.port.write_all(&command)?;
+        self.send(command)?;
         Ok(())
     }
 
-    fn set_spreading_factor(&mut self) -> Result<(), serial::Error> {
-        self.port.write_all(&[
-            KISS::FEND as u8,
-            RNODE::CMD_SF as u8,
-            self.config.sf,
-            KISS::FEND as u8,
-        ])?;
+    pub fn set_spreading_factor(&self) -> Result<(), Error> {
+        self.send(
+            [
+                KISS::FEND as u8,
+                RNODE::CMD_SF as u8,
+                self.config.sf,
+                KISS::FEND as u8,
+            ]
+            .to_vec(),
+        )?;
         Ok(())
     }
 
-    fn set_tx_power(&mut self) -> Result<(), serial::Error> {
-        self.port.write_all(&[
-            KISS::FEND as u8,
-            RNODE::CMD_TXPOWER as u8,
-            self.config.tx_power,
-            KISS::FEND as u8,
-        ])?;
+    pub fn set_tx_power(&self) -> Result<(), Error> {
+        self.send(
+            [
+                KISS::FEND as u8,
+                RNODE::CMD_TXPOWER as u8,
+                self.config.tx_power,
+                KISS::FEND as u8,
+            ]
+            .to_vec(),
+        )?;
         Ok(())
     }
 
-    fn set_coding_rate(&mut self) -> Result<(), serial::Error> {
-        self.port.write_all(&[
-            KISS::FEND as u8,
-            RNODE::CMD_CR as u8,
-            self.config.cr,
-            KISS::FEND as u8,
-        ])?;
+    pub fn set_coding_rate(&self) -> Result<(), Error> {
+        self.send(
+            [
+                KISS::FEND as u8,
+                RNODE::CMD_CR as u8,
+                self.config.cr,
+                KISS::FEND as u8,
+            ]
+            .to_vec(),
+        )?;
         Ok(())
     }
 
-    fn set_radio_state(&mut self, state: RadioState) -> Result<(), serial::Error> {
-        self.port.write_all(&[
-            KISS::FEND as u8,
-            RNODE::CMD_RADIO_STATE as u8,
-            state as u8,
-            KISS::FEND as u8,
-        ])?;
+    fn set_radio_state(&self, state: RadioState) -> Result<(), Error> {
+        self.send(
+            [
+                KISS::FEND as u8,
+                RNODE::CMD_RADIO_STATE as u8,
+                state as u8,
+                KISS::FEND as u8,
+            ]
+            .to_vec(),
+        )?;
         Ok(())
     }
 }
