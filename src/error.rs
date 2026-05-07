@@ -1,7 +1,10 @@
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 pub enum ErrorKind {
     SerialPort,
     Io,
+    InternalThread,
     PayloadTooLarge,
 }
 
@@ -36,6 +39,24 @@ impl Error {
 
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
+    }
+}
+
+impl<T> From<std::sync::mpsc::SendError<T>> for Error {
+    fn from(error: std::sync::mpsc::SendError<T>) -> Self {
+        Self {
+            kind: ErrorKind::InternalThread,
+            description: format!("thread reading from serial port is not active anymore: {error}"),
+        }
+    }
+}
+
+impl From<std::sync::mpsc::RecvError> for Error {
+    fn from(error: std::sync::mpsc::RecvError) -> Self {
+        Self {
+            kind: ErrorKind::InternalThread,
+            description: format!("thread reading from serial port is not active anymore: {error}"),
+        }
     }
 }
 

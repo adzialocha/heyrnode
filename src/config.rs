@@ -1,5 +1,10 @@
+use std::time::Duration;
+
 pub const BAUD_RATE: u32 = 115_200;
+
 pub const MTU: usize = 508;
+
+pub const TIMEOUT: Duration = Duration::from_millis(100);
 
 #[derive(Default)]
 pub enum Region {
@@ -61,6 +66,7 @@ impl Preset {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct RadioConfig {
     pub frequency: u32,
     pub bandwidth: u32,
@@ -70,7 +76,7 @@ pub struct RadioConfig {
 }
 
 impl RadioConfig {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             frequency: 0,
             bandwidth: 0,

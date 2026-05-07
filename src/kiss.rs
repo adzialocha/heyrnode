@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[allow(clippy::upper_case_acronyms, unused)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum KISS {
     FEND = 0xC0,
     FESC = 0xDB,
@@ -7,7 +7,6 @@ pub enum KISS {
     TFESC = 0xDD,
 }
 
-#[allow(unused)]
 impl KISS {
     pub fn escape(bytes: &[u8]) -> Vec<u8> {
         let bytes = Self::replace(
