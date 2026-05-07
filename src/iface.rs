@@ -228,7 +228,7 @@ impl RNodeInterface {
         Ok(data)
     }
 
-    pub fn verify(&self) -> Result<()> {
+    pub fn verify(&self) -> bool {
         self.report.verify(&self.config)
     }
 

@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 
 use crate::config::RadioConfig;
-use crate::error::Result;
 use crate::rnode::{RadioLock, RadioState};
 
 #[derive(Clone, Debug)]
@@ -29,6 +28,8 @@ pub struct Stats {
 }
 
 impl Report {
+    const BASE_TWO: usize = 2;
+
     pub fn new() -> Self {
         Self(Arc::new(Mutex::new(Inner::default())))
     }
@@ -88,40 +89,45 @@ impl Report {
         inner.stats.snr = snr;
     }
 
-    pub(crate) fn set_random(&self, value: u8) {
+    pub fn set_random(&self, value: u8) {
         let mut inner = self.0.lock().unwrap();
         inner.random = value;
     }
 
-    pub fn verify(&self, config: &RadioConfig) -> Result<()> {
+    pub fn verify(&self, config: &RadioConfig) -> bool {
         let inner = self.0.lock().unwrap();
 
         if let Some(frequency) = inner.frequency
-            && config.frequency != frequency {
-                // TODO
-            }
+            && config.frequency != frequency
+        {
+            return false;
+        }
 
         if let Some(bandwidth) = inner.bandwidth
-            && config.bandwidth != bandwidth {
-                // TODO
-            }
+            && config.bandwidth != bandwidth
+        {
+            return false;
+        }
 
         if let Some(sf) = inner.sf
-            && config.sf != sf {
-                // TODO
-            }
+            && config.sf != sf
+        {
+            return false;
+        }
 
         if let Some(cr) = inner.cr
-            && config.cr != cr {
-                // TODO
-            }
+            && config.cr != cr
+        {
+            return false;
+        }
 
         if let Some(tx_power) = inner.tx_power
-            && config.tx_power != tx_power {
-                // TODO
-            }
+            && config.tx_power != tx_power
+        {
+            return false;
+        }
 
-        Ok(())
+        true
     }
 
     pub fn bitrate(&self) -> f32 {
@@ -131,16 +137,11 @@ impl Report {
         let cr = inner.cr.unwrap_or_default() as f32;
         let bandwidth = inner.bandwidth.unwrap_or_default() as f32;
 
-        let base: usize = 2;
-        
-
-        sf
-            * ((4.0 / cr) / (base.pow(sf as u32) as f32 / (bandwidth / 1000_f32)))
+        sf * ((4.0 / cr) / (Self::BASE_TWO.pow(sf as u32) as f32 / (bandwidth / 1000_f32)))
             * 1000_f32
     }
 
     pub fn stats(&self) -> Stats {
-        let inner = self.0.lock().unwrap();
-        inner.stats.clone()
+        self.0.lock().unwrap().stats.clone()
     }
 }
