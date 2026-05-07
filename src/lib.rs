@@ -13,7 +13,7 @@ pub enum Region {
 }
 
 impl Region {
-    pub fn freq_start(&self) -> u32 {
+    pub fn min_frequency(&self) -> u32 {
         match self {
             Region::EU433 => 433_000_000,
             Region::EU868 => 869_400_000,
@@ -21,7 +21,7 @@ impl Region {
         }
     }
 
-    pub fn freq_end(&self) -> u32 {
+    pub fn max_frequency(&self) -> u32 {
         match self {
             Region::EU433 => 434_000_000,
             Region::EU868 => 869_650_000,
@@ -29,7 +29,7 @@ impl Region {
         }
     }
 
-    pub fn tx_power_limit(&self) -> u8 {
+    pub fn max_tx_power(&self) -> u8 {
         match self {
             Region::EU433 => 10,
             Region::EU868 => 27,
@@ -48,6 +48,18 @@ impl Preset {
     fn bandwidth(&self) -> u32 {
         match self {
             Preset::LongFast => 250_000,
+        }
+    }
+
+    fn coding_rate(&self) -> u8 {
+        match self {
+            Preset::LongFast => 5,
+        }
+    }
+
+    fn spread_factor(&self) -> u8 {
+        match self {
+            Preset::LongFast => 11,
         }
     }
 }
@@ -143,8 +155,11 @@ impl RadioConfig {
 
     pub fn from_preset(region: Region, preset: Preset) -> Self {
         Self::default()
-            .frequency(region.freq_start())
+            .frequency(region.min_frequency())
+            .tx_power(region.max_tx_power())
             .bandwidth(preset.bandwidth())
+            .spread_factor(preset.spread_factor())
+            .coding_rate(preset.coding_rate())
     }
 
     pub fn frequency(mut self, frequency: u32) -> Self {
