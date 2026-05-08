@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 
-use crate::config::{BAUD_RATE, MTU, RadioConfig, TIMEOUT};
+use crate::config::{BAUD_RATE, RadioConfig, SPLIT_PACKET_MTU, TIMEOUT};
 use crate::error::{Error, ErrorKind, Result};
 use crate::kiss::KISS;
 use crate::report::{Report, Stats};
@@ -47,7 +47,7 @@ impl RNodeInterface {
                 let mut command = Self::UNSET_COMMAND;
                 let mut in_frame = false;
 
-                let mut buffer = Vec::with_capacity(MTU);
+                let mut buffer = Vec::with_capacity(SPLIT_PACKET_MTU);
 
                 loop {
                     if port.bytes_to_read()? == 0 {
@@ -203,19 +203,16 @@ impl RNodeInterface {
     }
 
     fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
-        if command.as_ref().len() > MTU {
-            return Err(Error::from_kind(ErrorKind::PayloadTooLarge));
-        }
-
-        {
-            let mut port = self.port.lock().unwrap();
-            port.write_all(command.as_ref())?;
-        }
-
+        let mut port = self.port.lock().unwrap();
+        port.write_all(command.as_ref())?;
         Ok(())
     }
 
     pub fn send(&self, data: impl AsRef<[u8]>) -> Result<()> {
+        if data.as_ref().len() > SPLIT_PACKET_MTU {
+            return Err(Error::from_kind(ErrorKind::PayloadTooLarge));
+        }
+
         let mut command = Vec::new();
         command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_DATA as u8]);
         command.extend_from_slice(&KISS::escape(data.as_ref()));

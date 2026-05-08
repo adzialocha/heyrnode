@@ -2,7 +2,16 @@ use std::time::Duration;
 
 pub const BAUD_RATE: u32 = 115_200;
 
-pub const MTU: usize = 508;
+/// "Split Packet" framing implemented in RNode combining larger messages into (max.) two LoRa
+/// packets. This gives us a larger MTU than the "native" LoRa one.
+///
+/// ```text
+/// 508 bytes MTU = (255 bytes MTU * 2 packets) - (1 byte split packet header * 2 packets)
+/// ```
+pub const SPLIT_PACKET_MTU: usize = 508;
+
+/// "Native" MTU of a single LoRa packet.
+pub const SINGLE_MTU: usize = 255;
 
 pub const TIMEOUT: Duration = Duration::from_millis(100);
 

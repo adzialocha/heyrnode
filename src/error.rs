@@ -31,7 +31,10 @@ impl Error {
         match kind {
             ErrorKind::PayloadTooLarge => Self {
                 kind: ErrorKind::PayloadTooLarge,
-                description: format!("payload can't be larger than MTU of {}", crate::config::MTU),
+                description: format!(
+                    "payload can't be larger than MTU of {}",
+                    crate::config::SPLIT_PACKET_MTU
+                ),
             },
             _ => unimplemented!(),
         }
