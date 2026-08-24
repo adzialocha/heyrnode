@@ -190,6 +190,8 @@ impl RNodeInterface {
             port: Mutex::new(port),
         };
 
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
         rnode.set_frequency()?;
         rnode.set_bandwidth()?;
         rnode.set_tx_power()?;
