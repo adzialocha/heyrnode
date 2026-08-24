@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 
 use crate::config::RadioConfig;
-use crate::rnode::{RadioLock, RadioState};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Report(Arc<Mutex<Inner>>);
@@ -13,8 +12,8 @@ struct Inner {
     sf: Option<u8>,
     cr: Option<u8>,
     tx_power: Option<u8>,
-    radio_state: RadioState,
-    radio_lock: RadioLock,
+    radio_state: bool,
+    radio_lock: bool,
     stats: Stats,
     random: u8,
 }
@@ -59,12 +58,12 @@ impl Report {
         inner.tx_power = Some(tx_power);
     }
 
-    pub fn set_radio_state(&self, state: RadioState) {
+    pub fn set_radio_state(&self, state: bool) {
         let mut inner = self.0.lock().unwrap();
         inner.radio_state = state;
     }
 
-    pub fn set_radio_lock(&self, state: RadioLock) {
+    pub fn set_radio_lock(&self, state: bool) {
         let mut inner = self.0.lock().unwrap();
         inner.radio_lock = state;
     }

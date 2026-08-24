@@ -9,7 +9,7 @@ use crate::config::{BAUD_RATE, RadioConfig, SPLIT_PACKET_MTU, TIMEOUT};
 use crate::error::{Error, ErrorKind, Result};
 use crate::kiss::KISS;
 use crate::report::{Report, Stats};
-use crate::rnode::{RNODE, RadioLock, RadioState};
+use crate::rnode::RNODE;
 
 pub struct RNodeInterface {
     config: RadioConfig,
@@ -132,12 +132,14 @@ impl RNodeInterface {
                             }
                         } else if command == RNODE::CMD_RADIO_STATE as u8 {
                             if let Some(data) = buffer.pop() {
-                                report.set_radio_state(RadioState::try_from(data)?);
+                                let state = if data == 0x00 { false } else { true };
+                                report.set_radio_state(state);
                                 println!("received CMD_RADIO_STATE: {:?}", data);
                             }
                         } else if command == RNODE::CMD_RADIO_LOCK as u8 {
                             if let Some(data) = buffer.pop() {
-                                report.set_radio_lock(RadioLock::try_from(data)?);
+                                let state = if data == 0x00 { false } else { true };
+                                report.set_radio_lock(state);
                                 println!("received CMD_RADIO_LOCK: {:?}", data);
                             }
                         } else if command == RNODE::CMD_STAT_RX as u8 {
@@ -197,7 +199,7 @@ impl RNodeInterface {
         rnode.set_tx_power()?;
         rnode.set_spreading_factor()?;
         rnode.set_coding_rate()?;
-        rnode.set_radio_state(RadioState::ON)?;
+        rnode.set_radio_state(true)?;
 
         Ok(rnode)
     }
@@ -280,11 +282,11 @@ impl RNodeInterface {
         ])
     }
 
-    fn set_radio_state(&self, state: RadioState) -> Result<()> {
+    fn set_radio_state(&self, state: bool) -> Result<()> {
         self.send_command([
             KISS::FEND as u8,
             RNODE::CMD_RADIO_STATE as u8,
-            state as u8,
+            if state { 0x01 } else { 0x00 },
             KISS::FEND as u8,
         ])
     }
