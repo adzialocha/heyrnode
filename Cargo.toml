@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 serialport = "4.9.0"
+tracing = "0.1.44"
