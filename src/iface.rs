@@ -203,6 +203,7 @@ impl RNodeInterface {
     }
 
     fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
+        println!("send command: {:?}", command.as_ref());
         let mut port = self.port.lock().unwrap();
         port.write_all(command.as_ref())?;
         Ok(())
