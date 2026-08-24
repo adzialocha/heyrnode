@@ -15,13 +15,12 @@ pub struct RNodeInterface {
     config: RadioConfig,
     report: Report,
     port: Mutex<Box<dyn SerialPort>>,
-    rx: mpsc::Receiver<Vec<u8>>,
 }
 
 impl RNodeInterface {
     const UNSET_COMMAND: u8 = 0xFF;
 
-    pub fn new(port: &str, config: RadioConfig) -> Result<Self> {
+    pub fn new(port: &str, config: RadioConfig) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let report = Report::new();
 
         // Initialise serial port.
@@ -191,7 +190,6 @@ impl RNodeInterface {
             config,
             report,
             port: Mutex::new(port),
-            rx,
         };
 
         rnode.set_frequency()?;
@@ -201,7 +199,7 @@ impl RNodeInterface {
         rnode.set_coding_rate()?;
         rnode.set_radio_state(true)?;
 
-        Ok(rnode)
+        Ok((rnode, rx))
     }
 
     fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
@@ -220,11 +218,6 @@ impl RNodeInterface {
         command.extend_from_slice(&KISS::escape(data.as_ref()));
         command.extend_from_slice(&[KISS::FEND as u8]);
         self.send_command(command)
-    }
-
-    pub fn recv(&self) -> Result<Vec<u8>> {
-        let data = self.rx.recv()?;
-        Ok(data)
     }
 
     pub fn verify(&self) -> bool {
