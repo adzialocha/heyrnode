@@ -39,7 +39,7 @@ impl RNodeInterface {
             let report = report.clone();
 
             thread::spawn::<_, Result<()>>(move || {
-                let mut serial_buffer = Vec::with_capacity(1);
+                let mut serial_buffer = vec![0; 1];
                 let mut last_read = Instant::now();
 
                 let mut escape = false;
@@ -54,7 +54,7 @@ impl RNodeInterface {
                         {
                             escape = false;
                             command = Self::UNSET_COMMAND;
-                            in_frame = true;
+                            in_frame = false;
                             buffer = Vec::new();
                         }
 
@@ -68,37 +68,9 @@ impl RNodeInterface {
                     last_read = Instant::now();
 
                     if !in_frame && byte == KISS::FEND as u8 {
-                        escape = false;
                         command = Self::UNSET_COMMAND;
                         in_frame = true;
                         buffer = Vec::new();
-                    } else if in_frame {
-                        if buffer.is_empty() && command == Self::UNSET_COMMAND {
-                            command = byte;
-                        } else if command == RNODE::CMD_DATA as u8
-                            || command == RNODE::CMD_FREQUENCY as u8
-                            || command == RNODE::CMD_BANDWIDTH as u8
-                            || command == RNODE::CMD_STAT_RX as u8
-                            || command == RNODE::CMD_STAT_TX as u8
-                        {
-                            if byte == KISS::FESC as u8 {
-                                escape = true;
-                            } else {
-                                if escape {
-                                    if byte == KISS::TFEND as u8 {
-                                        byte = KISS::FEND as u8;
-                                    } else if byte == KISS::TFESC as u8 {
-                                        byte = KISS::FESC as u8;
-                                    }
-
-                                    escape = false;
-                                }
-
-                                buffer.push(byte);
-                            }
-                        } else {
-                            buffer.push(byte);
-                        }
                     } else if in_frame && byte == KISS::FEND as u8 {
                         if command == RNODE::CMD_DATA as u8 {
                             tx.send(buffer)?;
@@ -173,13 +145,39 @@ impl RNodeInterface {
                         } else if command == RNODE::CMD_READY as u8 {
                             println!("received CMD_READY: {:?}", buffer);
                         } else {
-                            println!("received unknown command: {:?}", buffer);
+                            println!("received unknown command: {} = {:?}", command, buffer);
                         }
 
-                        escape = false;
-                        command = Self::UNSET_COMMAND;
-                        in_frame = true;
+                        in_frame = false;
                         buffer = Vec::new();
+                        command = Self::UNSET_COMMAND;
+                    } else if in_frame {
+                        if buffer.is_empty() && command == Self::UNSET_COMMAND {
+                            command = byte;
+                        } else if command == RNODE::CMD_DATA as u8
+                            || command == RNODE::CMD_FREQUENCY as u8
+                            || command == RNODE::CMD_BANDWIDTH as u8
+                            || command == RNODE::CMD_STAT_RX as u8
+                            || command == RNODE::CMD_STAT_TX as u8
+                        {
+                            if byte == KISS::FESC as u8 {
+                                escape = true;
+                            } else {
+                                if escape {
+                                    if byte == KISS::TFEND as u8 {
+                                        byte = KISS::FEND as u8;
+                                    } else if byte == KISS::TFESC as u8 {
+                                        byte = KISS::FESC as u8;
+                                    }
+
+                                    escape = false;
+                                }
+
+                                buffer.push(byte);
+                            }
+                        } else {
+                            buffer.push(byte);
+                        }
                     }
                 }
             });
