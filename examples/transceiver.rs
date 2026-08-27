@@ -5,6 +5,8 @@ use heyrnode::RNodeInterface;
 use heyrnode::config::RadioConfig;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    setup_logging();
+
     let config = RadioConfig::default();
     let (rnode, rx) = RNodeInterface::new("/dev/ttyACM0", config)?;
     println!("verify = {}", rnode.verify());
@@ -42,5 +44,13 @@ fn input_loop(line_tx: mpsc::Sender<String>) -> Result<(), std::io::Error> {
             .send(buffer.clone())
             .map_err(|err| std::io::Error::other(err))?;
         buffer.clear();
+    }
+}
+
+fn setup_logging() {
+    if std::env::var("RUST_LOG").is_ok() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .try_init();
     }
 }
