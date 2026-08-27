@@ -7,7 +7,14 @@ use heyrnode::config::RadioConfig;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logging();
 
-    let config = RadioConfig::default();
+    // This works well with Heltec WiFi LoRa 32 v4.
+    let config = RadioConfig::default()
+        .bandwidth(125_000)
+        .frequency(868_000_000)
+        .tx_power(2)
+        .spread_factor(7)
+        .coding_rate(5);
+
     let (rnode, rx) = RNodeInterface::new("/dev/ttyACM0", config)?;
     println!("verify = {}", rnode.verify());
 
