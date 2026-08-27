@@ -4,6 +4,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
+use tracing::{debug, error, trace};
 
 use crate::config::{BAUD_RATE, RadioConfig, SPLIT_PACKET_MTU, TIMEOUT};
 use crate::error::{Error, ErrorKind, Result};
@@ -78,74 +79,74 @@ impl RNodeInterface {
                             if let Ok(data) = buffer.try_into() {
                                 let frequency = u32::from_be_bytes(data);
                                 report.set_frequency(frequency);
-                                println!("received CMD_FREQUENCY: {:?}", frequency);
+                                debug!("received CMD_FREQUENCY: {}", frequency);
                             }
                         } else if command == RNODE::CMD_BANDWIDTH as u8 {
                             if let Ok(data) = buffer.try_into() {
                                 let bandwidth = u32::from_be_bytes(data);
                                 report.set_bandwidth(bandwidth);
-                                println!("received CMD_BANDWIDTH: {:?}", bandwidth);
+                                debug!("received CMD_BANDWIDTH: {}", bandwidth);
                             }
                         } else if command == RNODE::CMD_TXPOWER as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_tx_power(data);
-                                println!("received CMD_TXPOWER: {:?}", data);
+                                debug!("received CMD_TXPOWER: {}", data);
                             }
                         } else if command == RNODE::CMD_SF as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_spreading_factor(data);
-                                println!("received CMD_SF: {:?}", data);
+                                debug!("received CMD_SF: {}", data);
                             }
                         } else if command == RNODE::CMD_CR as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_coding_rate(data);
-                                println!("received CMD_CR: {:?}", data);
+                                debug!("received CMD_CR: {}", data);
                             }
                         } else if command == RNODE::CMD_RADIO_STATE as u8 {
                             if let Some(data) = buffer.pop() {
                                 let state = if data == 0x00 { false } else { true };
                                 report.set_radio_state(state);
-                                println!("received CMD_RADIO_STATE: {:?}", data);
+                                debug!("received CMD_RADIO_STATE: {}", state);
                             }
                         } else if command == RNODE::CMD_RADIO_LOCK as u8 {
                             if let Some(data) = buffer.pop() {
                                 let state = if data == 0x00 { false } else { true };
                                 report.set_radio_lock(state);
-                                println!("received CMD_RADIO_LOCK: {:?}", data);
+                                debug!("received CMD_RADIO_LOCK: {}", state);
                             }
                         } else if command == RNODE::CMD_STAT_RX as u8 {
                             if let Ok(data) = buffer.try_into() {
                                 let stat_rx = u32::from_be_bytes(data);
                                 report.set_stat_rx(stat_rx);
-                                println!("received CMD_STAT_RX: {:?}", stat_rx);
+                                debug!("received CMD_STAT_RX: {}", stat_rx);
                             }
                         } else if command == RNODE::CMD_STAT_TX as u8 {
                             if let Ok(data) = buffer.try_into() {
                                 let stat_tx = u32::from_be_bytes(data);
                                 report.set_stat_tx(stat_tx);
-                                println!("received CMD_STAT_TX: {:?}", stat_tx);
+                                debug!("received CMD_STAT_TX: {}", stat_tx);
                             }
                         } else if command == RNODE::CMD_STAT_RSSI as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_stat_rssi(data);
-                                println!("received CMD_STAT_RSSI: {:?}", data);
+                                debug!("received CMD_STAT_RSSI: {}", data);
                             }
                         } else if command == RNODE::CMD_STAT_SNR as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_stat_snr(data);
-                                println!("received CMD_STAT_SNR: {:?}", data);
+                                debug!("received CMD_STAT_SNR: {}", data);
                             }
                         } else if command == RNODE::CMD_RANDOM as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_random(data);
-                                println!("received CMD_RANDOM: {:?}", data);
+                                debug!("received CMD_RANDOM: {}", data);
                             }
                         } else if command == RNODE::CMD_ERROR as u8 {
-                            println!("received CMD_ERROR: {:?}", buffer);
+                            error!("received CMD_ERROR: {:?}", buffer);
                         } else if command == RNODE::CMD_READY as u8 {
-                            println!("received CMD_READY: {:?}", buffer);
+                            debug!("received CMD_READY: {:?}", buffer);
                         } else {
-                            println!("received unknown command: {} = {:?}", command, buffer);
+                            trace!("received unknown command: {} = {:?}", command, buffer);
                         }
 
                         in_frame = false;
@@ -203,7 +204,7 @@ impl RNodeInterface {
     }
 
     fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
-        println!("send command: {:?}", command.as_ref());
+        debug!("send command: {:?}", command.as_ref());
         let mut port = self.port.lock().unwrap();
         port.write_all(command.as_ref())?;
         Ok(())
