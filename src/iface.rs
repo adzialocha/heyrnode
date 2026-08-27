@@ -146,7 +146,10 @@ impl RNodeInterface {
                         } else if command == RNODE::CMD_READY as u8 {
                             debug!("received CMD_READY: {:?}", buffer);
                         } else {
-                            trace!("received unknown command: {} = {:?}", command, buffer);
+                            trace!(
+                                "received unknown command: {} (0x{:x?}) = {:?}",
+                                command, command, buffer
+                            );
                         }
 
                         in_frame = false;

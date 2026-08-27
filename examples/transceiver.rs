@@ -3,6 +3,7 @@ use std::thread;
 
 use heyrnode::RNodeInterface;
 use heyrnode::config::RadioConfig;
+use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logging();
@@ -16,14 +17,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .coding_rate(5);
 
     let (rnode, rx) = RNodeInterface::new("/dev/ttyACM0", config)?;
-    println!("verify = {}", rnode.verify());
+    info!("verify = {}", rnode.verify());
 
     let (line_tx, line_rx) = mpsc::channel::<String>();
 
     thread::spawn(move || {
         loop {
-            let line = line_rx.recv().unwrap();
-            rnode.send(line.trim().as_bytes()).unwrap();
+            let line = line_rx.recv().expect("receive stdin string");
+
+            if line.starts_with("/stats") {
+                println!("{:?}", rnode.stats());
+            } else {
+                rnode.send(line.trim().as_bytes()).expect("send to RNode");
+            }
         }
     });
 
@@ -32,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match rx.recv() {
             Ok(bytes) => {
-                let message = String::from_utf8(bytes).unwrap();
+                let message = String::from_utf8(bytes).expect("decode UTF-8 bytes");
                 println!("> {message}");
             }
             Err(err) => {
