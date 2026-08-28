@@ -5,7 +5,7 @@ pub enum ErrorKind {
     SerialPort,
     Io,
     InternalThread,
-    PayloadTooLarge,
+    PayloadTooLarge(usize),
 }
 
 #[derive(Debug)]
@@ -29,12 +29,9 @@ impl std::fmt::Display for Error {
 impl Error {
     pub(crate) fn from_kind(kind: ErrorKind) -> Self {
         match kind {
-            ErrorKind::PayloadTooLarge => Self {
-                kind: ErrorKind::PayloadTooLarge,
-                description: format!(
-                    "payload can't be larger than MTU of {}",
-                    crate::config::SPLIT_PACKET_MTU
-                ),
+            ErrorKind::PayloadTooLarge(mtu) => Self {
+                kind: ErrorKind::PayloadTooLarge(mtu),
+                description: format!("payload can't be larger than MTU of {mtu}",),
             },
             _ => unimplemented!(),
         }

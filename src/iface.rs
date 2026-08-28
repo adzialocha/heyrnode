@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use tracing::{debug, error, trace};
 
-use crate::config::{BAUD_RATE, RadioConfig, SPLIT_PACKET_MTU, TIMEOUT};
+use crate::config::{BAUD_RATE, RadioConfig, SINGLE_MTU, SPLIT_PACKET_MTU, TIMEOUT};
 use crate::error::{Error, ErrorKind, Result};
 use crate::kiss::KISS;
 use crate::report::{Report, Stats};
@@ -33,6 +33,8 @@ impl RNodeInterface {
             .data_bits(DataBits::Eight)
             .timeout(TIMEOUT)
             .open()?;
+
+        let split_packet_mode = config.split_packet_mode;
 
         let (tx, rx) = mpsc::channel::<Vec<u8>>();
 
@@ -246,6 +248,7 @@ impl RNodeInterface {
         rnode.set_tx_power()?;
         rnode.set_spreading_factor()?;
         rnode.set_coding_rate()?;
+        rnode.set_split_packet_mode(split_packet_mode)?;
         rnode.set_radio_state(true)?;
 
         Ok((rnode, rx))
@@ -262,8 +265,16 @@ impl RNodeInterface {
     pub fn send(&self, data: impl AsRef<[u8]>) -> Result<()> {
         let data = data.as_ref();
 
-        if data.len() > SPLIT_PACKET_MTU {
-            return Err(Error::from_kind(ErrorKind::PayloadTooLarge));
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        if self.config.split_packet_mode && data.len() > SPLIT_PACKET_MTU {
+            return Err(Error::from_kind(ErrorKind::PayloadTooLarge(
+                SPLIT_PACKET_MTU,
+            )));
+        } else if !self.config.split_packet_mode && data.len() > SINGLE_MTU {
+            return Err(Error::from_kind(ErrorKind::PayloadTooLarge(SINGLE_MTU)));
         }
 
         let mut command = Vec::new();
@@ -346,8 +357,7 @@ impl RNodeInterface {
         ])
     }
 
-    #[allow(unused)]
-    fn set_promiscuous_mode(&self, mode: bool) -> Result<()> {
+    fn set_split_packet_mode(&self, mode: bool) -> Result<()> {
         self.send_command([
             KISS::FEND as u8,
             RNODE::CMD_PROMISC as u8,
