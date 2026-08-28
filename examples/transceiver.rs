@@ -1,3 +1,4 @@
+//! Send and receive UTF-8 byte-strings
 use std::sync::mpsc;
 use std::thread;
 
