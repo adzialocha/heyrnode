@@ -12,6 +12,7 @@ use crate::kiss::KISS;
 use crate::report::{Report, Stats};
 use crate::rnode::RNODE;
 
+#[derive(Debug)]
 pub struct RNodeInterface {
     config: RadioConfig,
     report: Report,
@@ -104,13 +105,13 @@ impl RNodeInterface {
                             }
                         } else if command == RNODE::CMD_RADIO_STATE as u8 {
                             if let Some(data) = buffer.pop() {
-                                let state = if data == 0x00 { false } else { true };
+                                let state = data != 0x00;
                                 report.set_radio_state(state);
                                 debug!("received CMD_RADIO_STATE: {}", state);
                             }
                         } else if command == RNODE::CMD_RADIO_LOCK as u8 {
                             if let Some(data) = buffer.pop() {
-                                let state = if data == 0x00 { false } else { true };
+                                let state = data != 0x00;
                                 report.set_radio_lock(state);
                                 debug!("received CMD_RADIO_LOCK: {}", state);
                             }

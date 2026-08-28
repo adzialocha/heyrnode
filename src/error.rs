@@ -45,6 +45,26 @@ impl Error {
     }
 }
 
+#[cfg(feature = "tokio")]
+impl From<tokio::sync::oneshot::error::RecvError> for Error {
+    fn from(error: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self {
+            kind: ErrorKind::InternalThread,
+            description: format!("thread managing inner rnode is not active anymore: {error}"),
+        }
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
+    fn from(error: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        Self {
+            kind: ErrorKind::InternalThread,
+            description: format!("thread managing inner rnode is not active anymore: {error}"),
+        }
+    }
+}
+
 impl<T> From<std::sync::mpsc::SendError<T>> for Error {
     fn from(error: std::sync::mpsc::SendError<T>) -> Self {
         Self {
