@@ -4,14 +4,12 @@ use std::thread;
 
 use heyrnode::RNodeInterface;
 use heyrnode::config::RadioConfig;
-use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logging();
 
     let config = RadioConfig::default();
     let (rnode, rx) = RNodeInterface::new("/dev/ttyACM0", config)?;
-    info!("verify = {}", rnode.verify());
 
     let (line_tx, line_rx) = mpsc::channel::<String>();
 
@@ -20,7 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let line = line_rx.recv().expect("receive stdin string");
 
             if line.starts_with("/stats") {
-                println!("{:?}", rnode.stats());
+                println!("{:#?}", rnode.stats());
+            } else if line.starts_with("/bitrate") {
+                println!("{0:.2} kbps", rnode.bitrate() / 1000f32);
+            } else if line.starts_with("/verify") {
+                println!("{}", rnode.verify());
             } else {
                 rnode.send(line.trim().as_bytes()).expect("send to RNode");
             }

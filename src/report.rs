@@ -20,17 +20,17 @@ struct Inner {
 
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
-    /// Data packets received.
-    rx: u32,
-
-    /// Bytes received.
-    rx_bytes: u32,
-
     /// Data packets sent.
     tx: u32,
 
+    /// Data packets received.
+    rx: u32,
+
     /// Bytes sent.
     tx_bytes: u32,
+
+    /// Bytes received.
+    rx_bytes: u32,
 
     /// Received signal strength indicator (RSSI).
     ///

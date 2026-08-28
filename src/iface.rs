@@ -245,8 +245,6 @@ impl RNodeInterface {
             port: Mutex::new(port),
         };
 
-        std::thread::sleep(std::time::Duration::from_secs(2));
-
         rnode.set_frequency()?;
         rnode.set_bandwidth()?;
         rnode.set_tx_power()?;
@@ -296,12 +294,6 @@ impl RNodeInterface {
     }
 
     pub fn stats(&self) -> Stats {
-        // Try to get latest stats from device.
-        let _ = self.get_channel_stats();
-        let _ = self.get_phy_stats();
-
-        std::thread::sleep(std::time::Duration::from_millis(150));
-
         self.report.stats()
     }
 
@@ -367,24 +359,6 @@ impl RNodeInterface {
             RNODE::CMD_PROMISC as u8,
             // "Promiscous mode" in RNode is _disabled_ split packet mode.
             u8::from(!mode),
-            KISS::FEND as u8,
-        ])
-    }
-
-    fn get_channel_stats(&self) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_STAT_CHTM as u8,
-            0xFF,
-            KISS::FEND as u8,
-        ])
-    }
-
-    fn get_phy_stats(&self) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_STAT_PHYPRM as u8,
-            0xFF,
             KISS::FEND as u8,
         ])
     }
