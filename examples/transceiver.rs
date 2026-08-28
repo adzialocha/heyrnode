@@ -9,14 +9,7 @@ use tracing::info;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logging();
 
-    // This works well with Heltec WiFi LoRa 32 v4.
-    let config = RadioConfig::default()
-        .bandwidth(125_000)
-        .frequency(868_000_000)
-        .tx_power(2)
-        .spread_factor(7)
-        .coding_rate(5);
-
+    let config = RadioConfig::default();
     let (rnode, rx) = RNodeInterface::new("/dev/ttyACM0", config)?;
     info!("verify = {}", rnode.verify());
 
