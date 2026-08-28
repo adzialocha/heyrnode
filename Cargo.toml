@@ -2,6 +2,13 @@
 name = "heyrnode"
 version = "0.1.0"
 edition = "2024"
+authors = [
+  "adz <x12@adz.garden>",
+]
+description = "Client to interface with RNode hardware via serial port"
+repository = "https://github.com/adzialocha/heyrnode"
+license = "MIT"
+readme = "README.md"
 
 [features]
 default = []
