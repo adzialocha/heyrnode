@@ -20,10 +20,69 @@ struct Inner {
 
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
+    /// Data packets received.
     rx: u32,
+
+    /// Bytes received.
+    rx_bytes: u32,
+
+    /// Data packets sent.
     tx: u32,
+
+    /// Bytes sent.
+    tx_bytes: u32,
+
+    /// Received signal strength indicator (RSSI).
+    ///
+    /// Measurement of the power present in a received radio signal.
     rssi: u8,
+
+    /// Signal-to-noise ratio (SNR).
+    ///
+    /// Ratio between the received power signal and the noise floor power level. If SNR is greater
+    /// than 0, the received signal operates above the noise floor.
+    ///
+    /// Typical LoRa SNR values are between -20dB and +10dB.
     snr: u8,
+
+    /// Airtime.
+    ats: u16,
+
+    /// Longterm airtime.
+    atl: u16,
+
+    /// Total channel utilization.
+    cls: u16,
+
+    /// Longterm channel utilization.
+    cll: u16,
+
+    /// Current RSSI (+ RSSI offset of 157).
+    crs: u8,
+
+    /// Noise floor (+ RSSI offset of 157).
+    nfl: u8,
+
+    /// Set to current RSSI if interference detected, otherwise 0xFF (255).
+    ntf: u8,
+
+    /// LoRa symbol time (ms).
+    lst: u16,
+
+    /// LoRa symbol rate.
+    lsr: u16,
+
+    /// LoRa preamble symbols.
+    prs: u16,
+
+    /// LoRa preamble time (ms).
+    prt: u16,
+
+    /// CSMA slot (ms).
+    cst: u16,
+
+    /// DIFS (ms).
+    dft: u16,
 }
 
 impl Report {
@@ -68,6 +127,26 @@ impl Report {
         inner.radio_lock = state;
     }
 
+    pub fn inc_stat_rx_bytes(&self, inc: u32) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.rx_bytes += inc;
+    }
+
+    pub fn inc_stat_rx(&self) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.rx += 1;
+    }
+
+    pub fn inc_stat_tx_bytes(&self, inc: u32) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.tx_bytes += inc;
+    }
+
+    pub fn inc_stat_tx(&self) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.tx += 1;
+    }
+
     pub fn set_stat_rx(&self, rx: u32) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.rx = rx;
@@ -86,6 +165,27 @@ impl Report {
     pub fn set_stat_snr(&self, snr: u8) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.snr = snr;
+    }
+
+    pub fn set_stat_chtm(&self, ats: u16, atl: u16, cls: u16, cll: u16, crs: u8, nfl: u8, ntf: u8) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.ats = ats;
+        inner.stats.atl = atl;
+        inner.stats.cls = cls;
+        inner.stats.cll = cll;
+        inner.stats.crs = crs;
+        inner.stats.nfl = nfl;
+        inner.stats.ntf = ntf;
+    }
+
+    pub fn set_stat_phyprm(&self, lst: u16, lsr: u16, prs: u16, prt: u16, cst: u16, dft: u16) {
+        let mut inner = self.0.lock().unwrap();
+        inner.stats.lst = lst;
+        inner.stats.lsr = lsr;
+        inner.stats.prs = prs;
+        inner.stats.prt = prt;
+        inner.stats.cst = cst;
+        inner.stats.dft = dft;
     }
 
     pub fn set_random(&self, value: u8) {

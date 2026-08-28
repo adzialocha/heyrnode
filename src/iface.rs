@@ -73,8 +73,39 @@ impl RNodeInterface {
                         command = Self::UNSET_COMMAND;
                         in_frame = true;
                         buffer = Vec::new();
+                    } else if in_frame && byte != KISS::FEND as u8 {
+                        if buffer.is_empty() && command == Self::UNSET_COMMAND {
+                            command = byte;
+                        } else if command == RNODE::CMD_DATA as u8
+                            || command == RNODE::CMD_FREQUENCY as u8
+                            || command == RNODE::CMD_BANDWIDTH as u8
+                            || command == RNODE::CMD_STAT_RX as u8
+                            || command == RNODE::CMD_STAT_TX as u8
+                            || command == RNODE::CMD_STAT_CHTM as u8
+                        {
+                            if byte == KISS::FESC as u8 {
+                                escape = true;
+                            } else {
+                                if escape {
+                                    if byte == KISS::TFEND as u8 {
+                                        byte = KISS::FEND as u8;
+                                    } else if byte == KISS::TFESC as u8 {
+                                        byte = KISS::FESC as u8;
+                                    }
+
+                                    escape = false;
+                                }
+
+                                buffer.push(byte);
+                            }
+                        } else {
+                            buffer.push(byte);
+                        }
                     } else if in_frame && byte == KISS::FEND as u8 {
                         if command == RNODE::CMD_DATA as u8 {
+                            // Data size plus one command and two KISS frame bytes.
+                            report.inc_stat_rx_bytes(buffer.len() as u32 + 3);
+                            report.inc_stat_rx();
                             tx.send(buffer)?;
                         } else if command == RNODE::CMD_FREQUENCY as u8 {
                             if let Ok(data) = buffer.try_into() {
@@ -137,6 +168,43 @@ impl RNodeInterface {
                                 report.set_stat_snr(data);
                                 debug!("received CMD_STAT_SNR: {}", data);
                             }
+                        } else if command == RNODE::CMD_STAT_CHTM as u8 {
+                            if let Ok(data) = TryInto::<[u8; 11]>::try_into(buffer) {
+                                let ats = u16::from_be_bytes([data[0], data[1]]);
+                                let atl = u16::from_be_bytes([data[2], data[3]]);
+                                let cls = u16::from_be_bytes([data[4], data[5]]);
+                                let cll = u16::from_be_bytes([data[6], data[7]]);
+                                let crs = data[8];
+                                let nfl = data[9];
+                                let ntf = data[10];
+                                report.set_stat_chtm(ats, atl, cls, cll, crs, nfl, ntf);
+                                debug!("received CMD_STAT_CHTM: {:?}", data);
+                            }
+                        } else if command == RNODE::CMD_STAT_PHYPRM as u8 {
+                            if let Ok(data) = TryInto::<[u8; 12]>::try_into(buffer) {
+                                let lst = u16::from_be_bytes([data[0], data[1]]);
+                                let lsr = u16::from_be_bytes([data[2], data[3]]);
+                                let prs = u16::from_be_bytes([data[4], data[5]]);
+                                let prt = u16::from_be_bytes([data[6], data[7]]);
+                                let cst = u16::from_be_bytes([data[8], data[9]]);
+                                let dft = u16::from_be_bytes([data[10], data[11]]);
+                                report.set_stat_phyprm(lst, lsr, prs, prt, cst, dft);
+                                debug!("received CMD_STAT_PHYPRM: {:?}", data);
+                            }
+                        } else if command == RNODE::CMD_STAT_BAT as u8 {
+                            if let Ok(data) = TryInto::<[u8; 2]>::try_into(buffer) {
+                                // 0x00 = unknown
+                                // 0x01 = discharging
+                                // 0x02 = charging
+                                // 0x03 = charged
+                                let state = data[0];
+                                let percentage = data[1];
+                                debug!("received CMD_STAT_BAT: {} {}", state, percentage);
+                            }
+                        } else if command == RNODE::CMD_STAT_TEMP as u8 {
+                            if let Some(data) = buffer.pop() {
+                                debug!("received CMD_STAT_TEMP: {}", data);
+                            }
                         } else if command == RNODE::CMD_RANDOM as u8 {
                             if let Some(data) = buffer.pop() {
                                 report.set_random(data);
@@ -156,33 +224,6 @@ impl RNodeInterface {
                         in_frame = false;
                         buffer = Vec::new();
                         command = Self::UNSET_COMMAND;
-                    } else if in_frame {
-                        if buffer.is_empty() && command == Self::UNSET_COMMAND {
-                            command = byte;
-                        } else if command == RNODE::CMD_DATA as u8
-                            || command == RNODE::CMD_FREQUENCY as u8
-                            || command == RNODE::CMD_BANDWIDTH as u8
-                            || command == RNODE::CMD_STAT_RX as u8
-                            || command == RNODE::CMD_STAT_TX as u8
-                        {
-                            if byte == KISS::FESC as u8 {
-                                escape = true;
-                            } else {
-                                if escape {
-                                    if byte == KISS::TFEND as u8 {
-                                        byte = KISS::FEND as u8;
-                                    } else if byte == KISS::TFESC as u8 {
-                                        byte = KISS::FESC as u8;
-                                    }
-
-                                    escape = false;
-                                }
-
-                                buffer.push(byte);
-                            }
-                        } else {
-                            buffer.push(byte);
-                        }
                     }
                 }
             });
@@ -208,9 +249,10 @@ impl RNodeInterface {
     }
 
     fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
-        debug!("send command: {:?}", command.as_ref());
+        let command = command.as_ref();
+        debug!("send command: {:?}", command);
         let mut port = self.port.lock().unwrap();
-        port.write_all(command.as_ref())?;
+        port.write_all(command)?;
         Ok(())
     }
 
@@ -223,6 +265,10 @@ impl RNodeInterface {
         command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_DATA as u8]);
         command.extend_from_slice(&KISS::escape(data.as_ref()));
         command.extend_from_slice(&[KISS::FEND as u8]);
+
+        self.report.inc_stat_tx_bytes(command.len() as u32);
+        self.report.inc_stat_tx();
+
         self.send_command(command)
     }
 
@@ -231,6 +277,12 @@ impl RNodeInterface {
     }
 
     pub fn stats(&self) -> Stats {
+        // Try to get latest stats from device.
+        let _ = self.get_channel_stats();
+        let _ = self.get_phy_stats();
+
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
         self.report.stats()
     }
 
@@ -296,6 +348,24 @@ impl RNodeInterface {
             KISS::FEND as u8,
             RNODE::CMD_PROMISC as u8,
             u8::from(mode),
+            KISS::FEND as u8,
+        ])
+    }
+
+    fn get_channel_stats(&self) -> Result<()> {
+        self.send_command([
+            KISS::FEND as u8,
+            RNODE::CMD_STAT_CHTM as u8,
+            0xFF,
+            KISS::FEND as u8,
+        ])
+    }
+
+    fn get_phy_stats(&self) -> Result<()> {
+        self.send_command([
+            KISS::FEND as u8,
+            RNODE::CMD_STAT_PHYPRM as u8,
+            0xFF,
             KISS::FEND as u8,
         ])
     }

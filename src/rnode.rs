@@ -21,6 +21,11 @@ pub enum RNODE {
     CMD_STAT_TX = 0x22,
     CMD_STAT_RSSI = 0x23,
     CMD_STAT_SNR = 0x24,
+    CMD_STAT_CHTM = 0x25,
+    CMD_STAT_PHYPRM = 0x26,
+    CMD_STAT_BAT = 0x27,
+    CMD_STAT_CSMA = 0x28,
+    CMD_STAT_TEMP = 0x29,
 
     CMD_BLINK = 0x30,
     CMD_RANDOM = 0x40,
@@ -38,5 +43,8 @@ pub enum RNODE_ERROR {
     INITRADIO = 0x01,
     TXFAILED = 0x02,
     EEPROM_LOCKED = 0x03,
+    QUEUE_FULL = 0x04,
+    MEMORY_LOW = 0x05,
+    MODEM_TIMEOUT = 0x06,
     UNKNOWN = 0xFF,
 }
