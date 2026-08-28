@@ -14,9 +14,11 @@ tokio = [
 [dependencies]
 futures-util = { version = "0.3.34", optional = true, default-features = false }
 serialport = "4.9.0"
-tokio = { version = "1.53.1", optional = true, features = ["rt", "sync"] }
+tokio = { version = "1.53.1", optional = true, features = ["sync"] }
 tokio-stream = { version = "0.1.19", optional = true, default-features = false, features = ["sync"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
+heyrnode = { path = ".", features = ["tokio"] }
+tokio = { version = "1.53.1", features = ["rt", "macros"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
