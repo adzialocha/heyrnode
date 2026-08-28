@@ -103,9 +103,7 @@ impl RNodeInterface {
                         }
                     } else if in_frame && byte == KISS::FEND as u8 {
                         if command == RNODE::CMD_DATA as u8 {
-                            // Data size plus one command and two KISS frame bytes.
-                            report.inc_stat_rx_bytes(buffer.len() as u32 + 3);
-                            report.inc_stat_rx();
+                            report.inc_stat_rx(buffer.len() as u32);
                             tx.send(buffer)?;
                         } else if command == RNODE::CMD_FREQUENCY as u8 {
                             if let Ok(data) = buffer.try_into() {
@@ -257,17 +255,18 @@ impl RNodeInterface {
     }
 
     pub fn send(&self, data: impl AsRef<[u8]>) -> Result<()> {
-        if data.as_ref().len() > SPLIT_PACKET_MTU {
+        let data = data.as_ref();
+
+        if data.len() > SPLIT_PACKET_MTU {
             return Err(Error::from_kind(ErrorKind::PayloadTooLarge));
         }
 
         let mut command = Vec::new();
         command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_DATA as u8]);
-        command.extend_from_slice(&KISS::escape(data.as_ref()));
+        command.extend_from_slice(&KISS::escape(data));
         command.extend_from_slice(&[KISS::FEND as u8]);
 
-        self.report.inc_stat_tx_bytes(command.len() as u32);
-        self.report.inc_stat_tx();
+        self.report.inc_stat_tx(data.len() as u32);
 
         self.send_command(command)
     }

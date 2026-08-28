@@ -127,24 +127,16 @@ impl Report {
         inner.radio_lock = state;
     }
 
-    pub fn inc_stat_rx_bytes(&self, inc: u32) {
-        let mut inner = self.0.lock().unwrap();
-        inner.stats.rx_bytes += inc;
-    }
-
-    pub fn inc_stat_rx(&self) {
+    pub fn inc_stat_rx(&self, bytes: u32) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.rx += 1;
+        inner.stats.rx_bytes += bytes;
     }
 
-    pub fn inc_stat_tx_bytes(&self, inc: u32) {
-        let mut inner = self.0.lock().unwrap();
-        inner.stats.tx_bytes += inc;
-    }
-
-    pub fn inc_stat_tx(&self) {
+    pub fn inc_stat_tx(&self, bytes: u32) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.tx += 1;
+        inner.stats.tx_bytes += bytes;
     }
 
     pub fn set_stat_rx(&self, rx: u32) {
@@ -167,6 +159,7 @@ impl Report {
         inner.stats.snr = snr;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_stat_chtm(&self, ats: u16, atl: u16, cls: u16, cll: u16, crs: u8, nfl: u8, ntf: u8) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.ats = ats;
@@ -178,6 +171,7 @@ impl Report {
         inner.stats.ntf = ntf;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_stat_phyprm(&self, lst: u16, lsr: u16, prs: u16, prt: u16, cst: u16, dft: u16) {
         let mut inner = self.0.lock().unwrap();
         inner.stats.lst = lst;
