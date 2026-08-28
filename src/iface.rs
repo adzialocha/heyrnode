@@ -196,8 +196,8 @@ impl RNodeInterface {
                                 // 0x02 = charging
                                 // 0x03 = charged
                                 let state = data[0];
-                                let percentage = data[1];
-                                debug!("received CMD_STAT_BAT: {} {}", state, percentage);
+                                let level = data[1];
+                                debug!("received CMD_STAT_BAT: {} {}", state, level);
                             }
                         } else if command == RNODE::CMD_STAT_TEMP as u8 {
                             if let Some(data) = buffer.pop() {
@@ -209,9 +209,14 @@ impl RNodeInterface {
                                 debug!("received CMD_RANDOM: {}", data);
                             }
                         } else if command == RNODE::CMD_ERROR as u8 {
-                            error!("received CMD_ERROR: {:?}", buffer);
+                            if let Some(error_code) = buffer.pop() {
+                                error!("received CMD_ERROR: {}", error_code);
+                            }
                         } else if command == RNODE::CMD_READY as u8 {
-                            debug!("received CMD_READY: {:?}", buffer);
+                            if let Some(data) = buffer.pop() {
+                                let state = data != 0x00;
+                                debug!("received CMD_READY: {}", state);
+                            }
                         } else {
                             trace!(
                                 "received unknown command: {} (0x{:x?}) = {:?}",
