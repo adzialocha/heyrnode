@@ -210,6 +210,10 @@ impl RNodeInterface {
                                 report.set_random(data);
                                 debug!("received CMD_RANDOM: {}", data);
                             }
+                        } else if command == RNODE::CMD_PROMISC as u8 {
+                            if let Some(mode) = buffer.pop() {
+                                debug!("received CMD_PROMISC: {}", mode);
+                            }
                         } else if command == RNODE::CMD_ERROR as u8 {
                             if let Some(error_code) = buffer.pop() {
                                 error!("received CMD_ERROR: {}", error_code);
@@ -361,7 +365,8 @@ impl RNodeInterface {
         self.send_command([
             KISS::FEND as u8,
             RNODE::CMD_PROMISC as u8,
-            u8::from(mode),
+            // "Promiscous mode" in RNode is _disabled_ split packet mode.
+            u8::from(!mode),
             KISS::FEND as u8,
         ])
     }
