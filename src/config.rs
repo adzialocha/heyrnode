@@ -24,19 +24,11 @@ pub enum Region {
 }
 
 impl Region {
-    pub fn min_frequency(&self) -> u32 {
+    pub fn frequency(&self) -> u32 {
         match self {
             Region::EU433 => 433_000_000,
-            Region::EU868 => 869_400_000,
-            Region::US => 902_000_000,
-        }
-    }
-
-    pub fn max_frequency(&self) -> u32 {
-        match self {
-            Region::EU433 => 434_000_000,
-            Region::EU868 => 869_650_000,
-            Region::US => 928_000_000,
+            Region::EU868 => 868_000_000,
+            Region::US => 915_000_000,
         }
     }
 
@@ -51,26 +43,51 @@ impl Region {
 
 #[derive(Default)]
 pub enum Preset {
+    ShortSlow,
+    ShortFast,
+    ShortTurbo,
+    MediumSlow,
+    MediumFast,
+    LongModerate,
+    LongSlow,
     #[default]
     LongFast,
+    LongTurbo,
 }
 
 impl Preset {
     fn bandwidth(&self) -> u32 {
         match self {
-            Preset::LongFast => 250_000,
+            Preset::LongModerate | Preset::LongSlow => 125_000,
+            Preset::ShortSlow
+            | Preset::ShortFast
+            | Preset::MediumSlow
+            | Preset::MediumFast
+            | Preset::LongFast => 250_000,
+            Preset::LongTurbo | Preset::ShortTurbo => 500_000,
         }
     }
 
     fn coding_rate(&self) -> u8 {
         match self {
-            Preset::LongFast => 5,
+            Preset::ShortSlow
+            | Preset::ShortFast
+            | Preset::ShortTurbo
+            | Preset::MediumSlow
+            | Preset::MediumFast
+            | Preset::LongFast => 5,
+            Preset::LongModerate | Preset::LongSlow | Preset::LongTurbo => 8,
         }
     }
 
     fn spread_factor(&self) -> u8 {
         match self {
-            Preset::LongFast => 11,
+            Preset::ShortFast | Preset::ShortTurbo => 7,
+            Preset::ShortSlow => 8,
+            Preset::MediumFast => 9,
+            Preset::MediumSlow => 10,
+            Preset::LongFast | Preset::LongTurbo | Preset::LongModerate => 11,
+            Preset::LongSlow => 12,
         }
     }
 }
@@ -82,6 +99,7 @@ pub struct RadioConfig {
     pub sf: u8,
     pub cr: u8,
     pub tx_power: u8,
+    pub split_packet_mode: bool,
 }
 
 impl RadioConfig {
@@ -92,12 +110,13 @@ impl RadioConfig {
             sf: 0,
             cr: 0,
             tx_power: 0,
+            split_packet_mode: false,
         }
     }
 
     pub fn from_preset(region: Region, preset: Preset) -> Self {
         Self::new()
-            .frequency(region.min_frequency())
+            .frequency(region.frequency())
             .bandwidth(preset.bandwidth())
             .spread_factor(preset.spread_factor())
             .coding_rate(preset.coding_rate())
@@ -126,6 +145,17 @@ impl RadioConfig {
 
     pub fn tx_power(mut self, tx_power: u8) -> Self {
         self.tx_power = tx_power;
+        self
+    }
+
+    /// "Split Packet" framing implemented in RNode combining larger messages into (max.) two LoRa
+    /// packets. This gives us a larger MTU than the "native" LoRa one (255 bytes).
+    ///
+    /// ```text
+    /// 508 bytes MTU = (255 bytes MTU * 2 packets) - (1 byte split packet header * 2 packets)
+    /// ```
+    pub fn split_packet_mode(mut self, mode: bool) -> Self {
+        self.split_packet_mode = mode;
         self
     }
 }
