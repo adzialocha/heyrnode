@@ -102,6 +102,10 @@ impl RNodeInterfaceAsync {
         Ok(())
     }
 
+    pub async fn recv(&mut self) -> Option<Vec<u8>> {
+        self.rx.next().await
+    }
+
     pub async fn verify(&self) -> Result<bool> {
         let (ready_tx, ready_rx) = oneshot::channel::<_>();
         self.tx.send(Command::Verify { ready_tx })?;
