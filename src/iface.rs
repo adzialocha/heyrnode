@@ -23,7 +23,7 @@ pub struct RNodeInterface {
 impl RNodeInterface {
     const UNSET_COMMAND: u8 = 0xFF;
 
-    pub fn new(port: &str, config: RadioConfig) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
+    pub fn new(port: &str, config: RadioConfig) -> Result<(Self, mpsc::Receiver<Bytes>)> {
         let report = Report::new();
 
         // Initialise serial port.
@@ -37,7 +37,7 @@ impl RNodeInterface {
 
         let split_packet_mode = config.split_packet_mode;
 
-        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        let (tx, rx) = mpsc::channel::<Bytes>();
 
         {
             let mut port = port.try_clone()?;
@@ -107,7 +107,7 @@ impl RNodeInterface {
                     } else if in_frame && byte == KISS::FEND as u8 {
                         if command == RNODE::CMD_DATA as u8 {
                             report.inc_stat_rx(buffer.len() as u32);
-                            tx.send(buffer)?;
+                            tx.send(Bytes::from(buffer))?;
                         } else if command == RNODE::CMD_FREQUENCY as u8 {
                             if let Ok(data) = buffer.try_into() {
                                 let frequency = u32::from_be_bytes(data);

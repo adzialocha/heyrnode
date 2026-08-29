@@ -13,7 +13,7 @@ use crate::{RNodeInterface, RadioConfig, Stats};
 #[derive(Debug)]
 pub struct RNodeInterfaceAsync {
     tx: mpsc::UnboundedSender<Command>,
-    rx: UnboundedReceiverStream<Vec<u8>>,
+    rx: UnboundedReceiverStream<Bytes>,
 }
 
 enum Command {
@@ -35,7 +35,7 @@ enum Command {
 impl RNodeInterfaceAsync {
     pub fn new(port: &str, config: RadioConfig) -> Result<Self> {
         let (tx, mut inner_rx) = mpsc::unbounded_channel::<Command>();
-        let (inner_tx, rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        let (inner_tx, rx) = mpsc::unbounded_channel::<Bytes>();
 
         let (iface, iface_rx) = RNodeInterface::new(port, config)?;
 
@@ -102,7 +102,7 @@ impl RNodeInterfaceAsync {
         Ok(())
     }
 
-    pub async fn recv(&mut self) -> Option<Vec<u8>> {
+    pub async fn recv(&mut self) -> Option<Bytes> {
         self.rx.next().await
     }
 
@@ -129,7 +129,7 @@ impl RNodeInterfaceAsync {
 }
 
 impl Stream for RNodeInterfaceAsync {
-    type Item = Vec<u8>;
+    type Item = Bytes;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.rx.poll_next_unpin(cx)

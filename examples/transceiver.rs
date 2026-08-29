@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match rx.recv() {
             Ok(bytes) => {
-                let message = String::from_utf8(bytes).expect("decode UTF-8 bytes");
+                let message = std::str::from_utf8(&bytes).expect("decode UTF-8 bytes");
                 println!("> {message}");
             }
             Err(err) => {
