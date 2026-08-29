@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = RadioConfig::default();
     let mut rnode = RNodeInterfaceAsync::new("/dev/ttyACM0", config)?;
 
-    rnode.send(b"Hello, World!").await?;
+    rnode.send(b"Hello, World!".to_vec()).await?;
 
     while let Some(data) = rnode.recv().await {
         println!("{:?}", data);

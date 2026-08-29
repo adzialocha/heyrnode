@@ -1,41 +1,79 @@
+use bytes::{BufMut, Bytes, BytesMut};
+
+/// KISS (Keep It Simple, Stupid) is a protocol for communicating with a serial terminal node
+/// controller (TNC) device used for amateur radio.
 #[repr(u8)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum KISS {
+    /// Frame End.
     FEND = 0xC0,
+
+    /// Frame Escape.
     FESC = 0xDB,
+
+    /// Transposed Frame End.
     TFEND = 0xDC,
+
+    /// Transposed Frame Escape.
     TFESC = 0xDD,
 }
 
 impl KISS {
-    pub fn escape(bytes: &[u8]) -> Vec<u8> {
+    /// If the FEND or FESC codes appear in the data to be transferred, they need to be escaped. The
+    /// FEND code is then sent as FESC, TFEND and the FESC is then sent as FESC, TFESC.
+    pub fn escape(bytes: Bytes) -> Bytes {
         let bytes = Self::replace(
             bytes,
-            &[KISS::FESC as u8],
+            KISS::FESC as u8,
             &[KISS::FESC as u8, KISS::TFESC as u8],
         );
+
         Self::replace(
-            &bytes,
-            &[KISS::FEND as u8],
+            bytes,
+            KISS::FEND as u8,
             &[KISS::FEND as u8, KISS::TFEND as u8],
         )
     }
 
-    fn replace(source: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
-        let mut result = source.to_vec();
-        let from_len = from.len();
-        let to_len = to.len();
+    fn replace(source: Bytes, from: u8, to: &[u8]) -> Bytes {
+        // Count occurrences.
+        let mut count = 0;
+        for &b in source.iter() {
+            if b == from {
+                count += 1;
+            }
+        }
+        if count == 0 {
+            return source;
+        }
 
-        let mut i = 0;
-        while i + from_len <= result.len() {
-            if result[i..].starts_with(from) {
-                result.splice(i..i + from_len, to.iter().cloned());
-                i += to_len;
+        // Pre-allocate exact capacity.
+        let extra = to.len().saturating_sub(1) * count;
+        let mut out = BytesMut::with_capacity(source.len() + extra);
+
+        for &b in source.iter() {
+            if b == from {
+                out.extend_from_slice(to);
             } else {
-                i += 1;
+                out.put_u8(b);
             }
         }
 
-        result
+        out.freeze()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+
+    use super::KISS;
+
+    #[test]
+    fn escape() {
+        assert_eq!(
+            KISS::escape(Bytes::from_iter([KISS::FEND as u8, 54, 45, 53, 54])),
+            vec![KISS::FEND as u8, KISS::TFEND as u8, 54, 45, 53, 54]
+        );
     }
 }

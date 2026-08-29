@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::thread;
 
+use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -18,7 +18,7 @@ pub struct RNodeInterfaceAsync {
 
 enum Command {
     SendData {
-        data: Vec<u8>,
+        data: Bytes,
         ready_tx: oneshot::Sender<Result<()>>,
     },
     Verify {
@@ -39,7 +39,7 @@ impl RNodeInterfaceAsync {
 
         let (iface, iface_rx) = RNodeInterface::new(port, config)?;
 
-        thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             loop {
                 let Some(command) = inner_rx.blocking_recv() else {
                     // Close thread if tx dropped.
@@ -67,7 +67,7 @@ impl RNodeInterfaceAsync {
             }
         });
 
-        thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             loop {
                 match iface_rx.recv() {
                     Ok(data) => {
@@ -90,8 +90,8 @@ impl RNodeInterfaceAsync {
         })
     }
 
-    pub async fn send(&self, data: impl AsRef<[u8]>) -> Result<()> {
-        let data = data.as_ref().to_vec();
+    pub async fn send(&self, data: impl Into<Bytes>) -> Result<()> {
+        let data = data.into();
         let (ready_tx, ready_rx) = oneshot::channel::<Result<()>>();
 
         self.tx.send(Command::SendData { data, ready_tx })?;

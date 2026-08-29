@@ -84,6 +84,7 @@ dependencies = [
 name = "heyrnode"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "futures-util",
  "heyrnode",
  "serialport",

@@ -3,6 +3,7 @@ use std::sync::{Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use bytes::{BufMut, Bytes, BytesMut};
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use tracing::{debug, error, trace};
 
@@ -72,9 +73,9 @@ impl RNodeInterface {
                     last_read = Instant::now();
 
                     if !in_frame && byte == KISS::FEND as u8 {
-                        command = Self::UNSET_COMMAND;
                         in_frame = true;
-                        buffer = Vec::new();
+                        command = Self::UNSET_COMMAND;
+                        buffer = Vec::with_capacity(SPLIT_PACKET_MTU);
                     } else if in_frame && byte != KISS::FEND as u8 {
                         if buffer.is_empty() && command == Self::UNSET_COMMAND {
                             command = byte;
@@ -231,7 +232,7 @@ impl RNodeInterface {
                         }
 
                         in_frame = false;
-                        buffer = Vec::new();
+                        buffer = Vec::with_capacity(SPLIT_PACKET_MTU);
                         command = Self::UNSET_COMMAND;
                     }
                 }
@@ -256,17 +257,25 @@ impl RNodeInterface {
         Ok((rnode, rx))
     }
 
-    fn send_command(&self, command: impl AsRef<[u8]>) -> Result<()> {
-        let command = command.as_ref();
+    fn send_command(&self, command_code: RNODE, data: Bytes) -> Result<()> {
+        // Plus two frame and one command code byte.
+        let mut command = BytesMut::with_capacity(data.len() + 3);
+
+        command.put_u8(KISS::FEND as u8);
+        command.put_u8(command_code as u8);
+        command.put(data);
+        command.put_u8(KISS::FEND as u8);
+
         debug!("send command: {:?}", command);
+
         let mut port = self.port.lock().unwrap();
-        port.write_all(command)?;
+        port.write_all(&command)?;
+
         Ok(())
     }
 
-    pub fn send(&self, data: impl AsRef<[u8]>) -> Result<()> {
-        let data = data.as_ref();
-
+    pub fn send(&self, data: impl Into<Bytes>) -> Result<()> {
+        let data = data.into();
         if data.is_empty() {
             return Ok(());
         }
@@ -279,14 +288,9 @@ impl RNodeInterface {
             return Err(Error::from_kind(ErrorKind::PayloadTooLarge(SINGLE_MTU)));
         }
 
-        let mut command = Vec::new();
-        command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_DATA as u8]);
-        command.extend_from_slice(&KISS::escape(data));
-        command.extend_from_slice(&[KISS::FEND as u8]);
-
         self.report.inc_stat_tx(data.len() as u32);
 
-        self.send_command(command)
+        self.send_command(RNODE::CMD_DATA, KISS::escape(data))
     }
 
     pub fn verify(&self) -> bool {
@@ -302,64 +306,39 @@ impl RNodeInterface {
     }
 
     fn set_frequency(&self) -> Result<()> {
-        let mut command = Vec::new();
-        command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_FREQUENCY as u8]);
-        command.extend_from_slice(&KISS::escape(&self.config.frequency.to_be_bytes()));
-        command.extend_from_slice(&[KISS::FEND as u8]);
-        self.send_command(command)
+        self.send_command(
+            RNODE::CMD_FREQUENCY,
+            KISS::escape(Bytes::from_iter(self.config.frequency.to_be_bytes())),
+        )
     }
 
     fn set_bandwidth(&self) -> Result<()> {
-        let mut command = Vec::new();
-        command.extend_from_slice(&[KISS::FEND as u8, RNODE::CMD_BANDWIDTH as u8]);
-        command.extend_from_slice(&KISS::escape(&self.config.bandwidth.to_be_bytes()));
-        command.extend_from_slice(&[KISS::FEND as u8]);
-        self.send_command(command)
+        self.send_command(
+            RNODE::CMD_BANDWIDTH,
+            KISS::escape(Bytes::from_iter(self.config.bandwidth.to_be_bytes())),
+        )
     }
 
     fn set_spreading_factor(&self) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_SF as u8,
-            self.config.sf,
-            KISS::FEND as u8,
-        ])
+        self.send_command(RNODE::CMD_SF, Bytes::from_iter([self.config.sf]))
     }
 
     fn set_tx_power(&self) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_TXPOWER as u8,
-            self.config.tx_power,
-            KISS::FEND as u8,
-        ])
+        self.send_command(RNODE::CMD_TXPOWER, Bytes::from_iter([self.config.tx_power]))
     }
 
     fn set_coding_rate(&self) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_CR as u8,
-            self.config.cr,
-            KISS::FEND as u8,
-        ])
+        self.send_command(RNODE::CMD_CR, Bytes::from_iter([self.config.cr]))
     }
 
     fn set_radio_state(&self, state: bool) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_RADIO_STATE as u8,
-            if state { 0x01 } else { 0x00 },
-            KISS::FEND as u8,
-        ])
+        let data = if state { 0x01 } else { 0x00 };
+        self.send_command(RNODE::CMD_RADIO_STATE, Bytes::from_iter([data]))
     }
 
     fn set_split_packet_mode(&self, mode: bool) -> Result<()> {
-        self.send_command([
-            KISS::FEND as u8,
-            RNODE::CMD_PROMISC as u8,
-            // "Promiscous mode" in RNode is _disabled_ split packet mode.
-            u8::from(!mode),
-            KISS::FEND as u8,
-        ])
+        // "Promiscous mode" in RNode is _disabled_ if split packet mode is true.
+        let promisc = if mode { 0x00 } else { 0x01 };
+        self.send_command(RNODE::CMD_PROMISC, Bytes::from_iter([promisc]))
     }
 }

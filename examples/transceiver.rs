@@ -24,7 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else if line.starts_with("/verify") {
                 println!("{}", rnode.verify());
             } else {
-                rnode.send(line.trim().as_bytes()).expect("send to RNode");
+                let bytes = line.trim().as_bytes().to_vec();
+                rnode.send(bytes).expect("send to RNode");
             }
         }
     });
