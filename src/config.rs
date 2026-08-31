@@ -110,7 +110,7 @@ impl RadioConfig {
             sf: 0,
             cr: 0,
             tx_power: 0,
-            split_packet_mode: false,
+            split_packet_mode: true,
         }
     }
 
