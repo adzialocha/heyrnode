@@ -1,8 +1,4 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use bytes::Bytes;
-use futures_util::{Stream, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
@@ -13,7 +9,6 @@ use crate::{RNodeInterface, RadioConfig, Stats};
 #[derive(Debug)]
 pub struct RNodeInterfaceAsync {
     tx: mpsc::UnboundedSender<Command>,
-    rx: UnboundedReceiverStream<Bytes>,
 }
 
 enum Command {
@@ -33,7 +28,7 @@ enum Command {
 }
 
 impl RNodeInterfaceAsync {
-    pub fn new(port: &str, config: RadioConfig) -> Result<Self> {
+    pub fn new(port: &str, config: RadioConfig) -> Result<(Self, UnboundedReceiverStream<Bytes>)> {
         let (tx, mut inner_rx) = mpsc::unbounded_channel::<Command>();
         let (inner_tx, rx) = mpsc::unbounded_channel::<Bytes>();
 
@@ -84,10 +79,7 @@ impl RNodeInterfaceAsync {
             }
         });
 
-        Ok(Self {
-            tx,
-            rx: UnboundedReceiverStream::new(rx),
-        })
+        Ok((Self { tx }, UnboundedReceiverStream::new(rx)))
     }
 
     pub async fn send(&self, data: impl Into<Bytes>) -> Result<()> {
@@ -100,10 +92,6 @@ impl RNodeInterfaceAsync {
         result?;
 
         Ok(())
-    }
-
-    pub async fn recv(&mut self) -> Option<Bytes> {
-        self.rx.next().await
     }
 
     pub async fn verify(&self) -> Result<bool> {
@@ -125,13 +113,5 @@ impl RNodeInterfaceAsync {
         self.tx.send(Command::Bitrate { ready_tx })?;
         let result = ready_rx.await?;
         Ok(result)
-    }
-}
-
-impl Stream for RNodeInterfaceAsync {
-    type Item = Bytes;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.rx.poll_next_unpin(cx)
     }
 }
